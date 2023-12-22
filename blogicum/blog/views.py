@@ -41,7 +41,7 @@ class BaseListMixin:
             'location',
         ).order_by(
             '-pub_date'
-            )
+        )
 
 
 class PostsListView(BaseListMixin, ListView):
@@ -77,7 +77,7 @@ class ProfileBaseMixin(TemplateResponseMixin):
         return get_object_or_404(
             get_user_model(),
             username=self.kwargs['username']
-            )
+        )
 
 
 class Profile(ProfileBaseMixin, MultipleObjectMixin, BaseDetailView):
@@ -86,28 +86,28 @@ class Profile(ProfileBaseMixin, MultipleObjectMixin, BaseDetailView):
     def get_queryset(self):
         return Post.objects.filter(
             author__username=self.get_object()
-            ).select_related(
-                'author',
-                'category',
-                'location',
-            ).order_by(
-                '-pub_date',
-            ).annotate(
+        ).select_related(
+            'author',
+            'category',
+            'location',
+        ).order_by(
+            '-pub_date',
+        ).annotate(
             comment_count=Count('comments')
-            )
+        )
 
     def get_context_data(self, **kwargs):
         if self.request.user == self.get_object():
             context = super().get_context_data(
                 object_list=self.get_queryset(),
                 **kwargs
-                )
+            )
         else:
             context = super().get_context_data(
                 object_list=self.get_queryset().filter(
                     is_published=True,
                     pub_date__lte=timezone.now(),
-                    ),
+                ),
                 **kwargs
             )
         context['profile'] = self.get_object()
@@ -128,7 +128,7 @@ class ObjectPostMixin:
         self.publish = get_object_or_404(
             bound,
             id=self.kwargs['post_id']
-            )
+        )
         return super().dispatch(request, *args, **kwargs)
 
     def post(self, request, *args, **kwargs):
@@ -145,10 +145,10 @@ class PostDetail(ObjectPostMixin, ModelFormMixin, DetailView):
     form_class = CommentForm
 
     def get(self, request, *args, **kwargs):
-        if (self.publish.is_published and
-            self.publish.category.is_published and
-            self.publish.pub_date < timezone.now()
-        ):
+        if (self.publish.is_published
+            and self.publish.category.is_published
+            and self.publish.pub_date < timezone.now()
+            ):
             return super().get(request, *args, *kwargs)
         else:
             if self.publish.author == request.user:
@@ -193,7 +193,7 @@ class PostEdit(ObjectPostMixin, PostCreate, UpdateView):
         )
 
 
-class PostDelete(ObjectPostMixin, PostCreate,  DeleteView):
+class PostDelete(ObjectPostMixin, PostCreate, DeleteView):
 
     def get_success_url(self):
         return reverse_lazy(
@@ -241,8 +241,8 @@ class CommentDelete(CommentEditDeleteMixin, DeleteView):
 
     def dispatch(self, request, *args, **kwargs):
         if (
-            self.get_object().author == request.user or
-            request.user.is_superuser
+            self.get_object().author == request.user
+            or request.user.is_superuser
         ):
             return super().dispatch(request, *args, **kwargs)
         return HttpResponseRedirect(self.get_success_url())
