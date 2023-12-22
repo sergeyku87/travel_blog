@@ -148,7 +148,7 @@ class PostDetail(ObjectPostMixin, ModelFormMixin, DetailView):
         if (self.publish.is_published
             and self.publish.category.is_published
             and self.publish.pub_date < timezone.now()
-            ):
+        ):
             return super().get(request, *args, *kwargs)
         else:
             if self.publish.author == request.user:
