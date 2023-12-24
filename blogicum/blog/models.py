@@ -1,9 +1,26 @@
-from django.db import models
 from django.contrib.auth import get_user_model
+from django.db import models
 from django.urls import reverse_lazy
 
-from core.models import PublishedModel
 from blogicum.constants import CHARACTERS_IN_STRING, MAX_CHARACTERS
+from core.models import PublishedModel
+
+'''
+По поводу related_name, я правильно понял, что имя должно
+отображать суть той информации которую мы хотим
+получить из первичной модели, допустим говорим:
+Вася, дай все по related_name, и мы получаем его посты, так же
+мы делаем related_name из Category,и  получаем посты
+связанные с этой категорией и т.д.
+Получается по сути related_name должна называться posts,
+и там и там. Правильно я рассуждаю?
+
+
+по поводу txt, я его так и назвал, text, но у меня начались коллизии,
+когда выводилась страница поста, в форме где надо оставлять
+комментарий, выводилась поле text из модели Post, поэтому я его
+ и сократил до txt ))
+'''
 
 
 class Post(PublishedModel):
@@ -33,7 +50,7 @@ class Post(PublishedModel):
         blank=True,
         null=True,
         verbose_name='Местоположение',
-        related_name='place'
+        related_name='places'
     )
     category = models.ForeignKey(
         'Category',
@@ -117,9 +134,10 @@ class Comment(PublishedModel):
         null=True,
         related_name='comments_author',
     )
-    txt = models.TextField(
+    message = models.TextField(
         verbose_name='Комментарий',
     )
+
 
     class Meta(PublishedModel.Meta):
         verbose_name = 'комментарий'

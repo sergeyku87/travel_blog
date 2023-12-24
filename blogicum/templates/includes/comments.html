@@ -19,7 +19,7 @@
       </h5>
       <small class="text-muted">{{ comment.created_at }}</small>
       <br>
-      {{ comment.txt|linebreaksbr }}
+      {{ comment.message|linebreaksbr }}
     </div>
     {% if user == comment.author %}
       <a class="btn btn-sm text-muted"

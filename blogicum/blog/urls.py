@@ -28,12 +28,12 @@ urlpatterns = [
         name='category_posts'
     ),
     path(
-        'profile/<slug:username>/',
+        'profile/<str:username>/',
         Profile.as_view(),
         name='profile'
     ),
     path(
-        'profile/<slug:username>/edit/',
+        'profile/<str:username>/edit/',
         EditProfile.as_view(),
         name='edit_profile'
     ),

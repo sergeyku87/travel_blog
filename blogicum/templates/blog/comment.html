@@ -30,7 +30,7 @@
             {% if not '/delete_comment/' in request.path %}
               {% bootstrap_form form %}
             {% else %}
-              <p>{{ comment.txt }}</p>
+              <p>{{ comment.message }}</p>
             {% endif %}
             {% bootstrap_button button_type="submit" content="Отправить" %}
           </form>
