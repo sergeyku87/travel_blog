@@ -138,7 +138,6 @@ class Comment(PublishedModel):
         verbose_name='Комментарий',
     )
 
-
     class Meta(PublishedModel.Meta):
         verbose_name = 'комментарий'
         verbose_name_plural = 'Комментарии'

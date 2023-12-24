@@ -118,23 +118,26 @@ class Profile(ListView):
             queryset=self.model.objects.select_related(
                 'category',
                 'location',
-                ).filter(
+            ).filter(
                 is_published=True,
                 pub_date__lte=timezone.now(),
                 category__is_published=True,
-                ).annotate(
-                    comment_count=Count('comments')
-                ).order_by('-pub_date')
+            ).annotate(
+                comment_count=Count('comments')
+            ).order_by(
+                '-pub_date'
+            )
         )
         prefetch_for_author = Prefetch(
             'author',
             queryset=self.model.objects.select_related(
                 'category',
                 'location',
-                ).filter(
-                ).annotate(
-                    comment_count=Count('comments')
-                ).order_by('-pub_date')
+            ).annotate(
+                comment_count=Count('comments')
+            ).order_by(
+                '-pub_date'
+            )
         )
         try:
             if str(self.request.user) == self.kwargs['username']:
@@ -143,7 +146,7 @@ class Profile(ListView):
                 ).get(username=self.kwargs['username']).author.all()
             return get_user_model().objects.prefetch_related(
                 prefetch_for_all
-                ).get(username=self.kwargs['username']).author.all()
+            ).get(username=self.kwargs['username']).author.all()
         except ObjectDoesNotExist:
             raise Http404
 
