@@ -79,12 +79,12 @@ class Profile(ListView):
         print(self.kwargs['username'])
 
         return self.model.objects.filter(
-            Q(author__username=self.request.user) |
-            (
-                Q(is_published=True) &
-                Q(category__is_published=True) &
-                Q(author__username=self.kwargs['username']) &
-                Q(pub_date__lte=timezone.now())
+            Q(author__username=self.request.user)
+            | (
+                Q(is_published=True)
+                & Q(category__is_published=True)
+                & Q(author__username=self.kwargs['username'])
+                & Q(pub_date__lte=timezone.now())
             )
         ).annotate(
             comment_count=Count('comments')
@@ -119,11 +119,11 @@ class PostDetail(ModelFormMixin, DetailView):
 
     def get_queryset(self):
         return self.model.objects.filter(
-            Q(author__username=self.request.user) |
-            (
-                Q(is_published=True) &
-                Q(category__is_published=True) &
-                Q(pub_date__lte=timezone.now())
+            Q(author__username=self.request.user)
+            | (
+                Q(is_published=True)
+                & Q(category__is_published=True)
+                & Q(pub_date__lte=timezone.now())
             )
         )
 
