@@ -1,8 +1,10 @@
 from django.contrib.auth import get_user_model
-from django.contrib.auth.mixins import LoginRequiredMixin
-from django.core.exceptions import ObjectDoesNotExist
-from django.db.models import Count, Prefetch
-from django.http import Http404, HttpResponseRedirect
+from django.contrib.auth.mixins import (
+    LoginRequiredMixin,
+    UserPassesTestMixin,
+)
+from django.db.models import Count, Q
+from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404
 from django.urls import reverse_lazy
 from django.utils import timezone
@@ -22,9 +24,10 @@ from .models import Category, Comment, Post
 
 class BaseListMixin:
     paginate_by = NUMBER_POSTS_ON_PAGE
+    model = Post
 
     def get_queryset(self):
-        return Post.objects.filter(
+        return self.model.objects.filter(
             pub_date__lte=timezone.now(),
             is_published=True,
             category__is_published=True,
@@ -61,46 +64,6 @@ class CategoryListView(BaseListMixin, ListView):
         )
 
 
-'''
-Не знаю на сколько правильно я понял применение класса Prefetch,
-но получилась такая вот там простыня получилась)) в конце я обернул в try,
-потому что тесты ругались
-
-    @pytest.mark.django_db
-    def test_profile(
-            user, another_user, user_client, another_user_client,
-            unlogged_client
-    ):
-        user_url = f"/profile/{user.username}/"
-        printed_url = "/profile/<username>/"
-
-        User = get_user_model()
-        status_code_not_404_err_msg = (
-            "Убедитесь, что при обращении к странице несуществующего "
-            "пользователя возвращается статус 404."
-        )
-        try:
-            response = user_client.get("/profile/this_is_unexisting_user_name
-        except User.DoesNotExist:
->           raise AssertionError(status_code_not_404_err_msg)
-E           AssertionError: Убедитесь, что при обращении к странице
-несуществующего пользователя возвращается статус 404.
-
-
-я так понял из за того что get_user_model() не через get_object_or_404
-вызывался.
-
-В методах get и  post я ведь могу логику запроса обрабатывать, кому что
-показывать, кого куда переадресовать?
-
-Как я понимаю каждый логический запрос, это обращение к базе данных,
-посмотри то, сравни с тем, это ведь не хорошо, что мы кне часто обращаемся
-так, что на практике с этим делают (я так думаю может, при первом обращении,
-вытянуть из бд нужные данные сохранить их в переменные, и потом использовать
-в логических операциях) ???
-'''
-
-
 class Profile(ListView):
     paginate_by = NUMBER_POSTS_ON_PAGE
     template_name = 'blog/profile.html'
@@ -113,42 +76,21 @@ class Profile(ListView):
         )
 
     def get_queryset(self):
-        prefetch_for_all = Prefetch(
-            'author',
-            queryset=self.model.objects.select_related(
-                'category',
-                'location',
-            ).filter(
-                is_published=True,
-                pub_date__lte=timezone.now(),
-                category__is_published=True,
-            ).annotate(
-                comment_count=Count('comments')
-            ).order_by(
-                '-pub_date'
+        print(self.kwargs['username'])
+
+        return self.model.objects.filter(
+            Q(author__username=self.request.user) |
+            (
+                Q(is_published=True) &
+                Q(category__is_published=True) &
+                Q(author__username=self.kwargs['username']) &
+                Q(pub_date__lte=timezone.now())
             )
+        ).annotate(
+            comment_count=Count('comments')
+        ).order_by(
+            '-pub_date'
         )
-        prefetch_for_author = Prefetch(
-            'author',
-            queryset=self.model.objects.select_related(
-                'category',
-                'location',
-            ).annotate(
-                comment_count=Count('comments')
-            ).order_by(
-                '-pub_date'
-            )
-        )
-        try:
-            if str(self.request.user) == self.kwargs['username']:
-                return get_user_model().objects.prefetch_related(
-                    prefetch_for_author
-                ).get(username=self.kwargs['username']).author.all()
-            return get_user_model().objects.prefetch_related(
-                prefetch_for_all
-            ).get(username=self.kwargs['username']).author.all()
-        except ObjectDoesNotExist:
-            raise Http404
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data()
@@ -175,23 +117,21 @@ class PostDetail(ModelFormMixin, DetailView):
     form_class = CommentForm
     model = Post
 
-    def get_object(self):
-        return get_object_or_404(
-            self.model.objects.select_related('author'),
-            id=self.kwargs['post_id']
+    def get_queryset(self):
+        return self.model.objects.filter(
+            Q(author__username=self.request.user) |
+            (
+                Q(is_published=True) &
+                Q(category__is_published=True) &
+                Q(pub_date__lte=timezone.now())
+            )
         )
 
-    def get(self, request, *args, **kwargs):
-        if (
-            self.get_object().is_published
-            and self.get_object().category.is_published
-            and self.get_object().pub_date < timezone.now()
-        ):
-            return super().get(request, *args, *kwargs)
-        else:
-            if self.get_object().author == request.user:
-                return super().get(request, *args, *kwargs)
-            raise Http404
+    def get_object(self):
+        return get_object_or_404(
+            self.get_queryset(),
+            id=self.kwargs['post_id']
+        )
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -201,7 +141,7 @@ class PostDetail(ModelFormMixin, DetailView):
         return context
 
 
-class CommonForPost(LoginRequiredMixin):
+class CommonForPost():
     template_name = 'blog/create.html'
     form_class = PostForm
 
@@ -212,14 +152,7 @@ class CommonForPost(LoginRequiredMixin):
         )
 
 
-class RedirectMixin:
-    def post(self, request, *args, **kwargs):
-        if self.get_object().author != request.user:
-            return HttpResponseRedirect(self.get_object().get_absolute_url())
-        return super().post(request, *args, **kwargs)
-
-
-class PostCreate(CommonForPost, CreateView):
+class PostCreate(LoginRequiredMixin, CommonForPost, CreateView):
     def form_valid(self, form):
         post = form.save(commit=False)
         post.author = self.request.user
@@ -233,11 +166,45 @@ class PostCreate(CommonForPost, CreateView):
         )
 
 
-class PostEdit(CommonForPost, RedirectMixin, UpdateView):
-    ...
+class IsUser(UserPassesTestMixin):
+    def test_func(self):
+        return str(self.request.user) == self.get_object().author.username
+
+    def get_login_url(self):
+        return reverse_lazy(
+            'blog:post_detail',
+            args=(self.kwargs['post_id'],)
+        )
 
 
-class PostDelete(CommonForPost, RedirectMixin, DeleteView):
+'''
+Привет, беда, печаль (((
+В PostEdit я не могу подмешать IsUser, тесты выдают ошибку:
+
+AssertionError: Убедитесь, что при отправке формы
+редактирования поста неавторизованным пользователем он
+перенаправляется на страницу публикации
+(/posts/<int:post_id>/).
+
+А с методом post внутри все проходит, как с этим быть ?
+
+Не совсем понял по PermissionRequiredMixin, если классу
+PostEdit установить permission_required = 'blog.change_post'
+и разным пользователям дать права на редактирование,
+то где происходит проверка на авторство, не могут же они,
+имея одно лишь право change, менять любой контент,
+даже себе не принадлежащий?
+'''
+
+
+class PostEdit(CommonForPost, UpdateView):
+    def post(self, request, *args, **kwargs):
+        if self.get_object().author != request.user:
+            return HttpResponseRedirect(self.get_object().get_absolute_url())
+        return super().post(request, *args, **kwargs)
+
+
+class PostDelete(IsUser, CommonForPost, DeleteView):
     def get_success_url(self):
         return reverse_lazy(
             'blog:profile',
@@ -255,7 +222,8 @@ class CommentAdd(LoginRequiredMixin, CreateView):
         return super().form_valid(form)
 
 
-class CommentEditDeleteMixin(LoginRequiredMixin):
+class CommentEdit(IsUser, UpdateView):
+    form_class = CommentForm
     template_name = 'blog/comment.html'
 
     def get_success_url(self):
@@ -271,15 +239,17 @@ class CommentEditDeleteMixin(LoginRequiredMixin):
         )
 
 
-class CommentEdit(CommentEditDeleteMixin, RedirectMixin, UpdateView):
-    form_class = CommentForm
+class CommentDelete(IsUser, DeleteView):
+    template_name = 'blog/comment.html'
 
+    def get_success_url(self):
+        return reverse_lazy(
+            'blog:post_detail',
+            args=(self.kwargs['post_id'],)
+        )
 
-class CommentDelete(CommentEditDeleteMixin, DeleteView):
-    def post(self, request, *args, **kwargs):
-        if (
-            self.get_object().author == request.user
-            or request.user.is_superuser
-        ):
-            return super().post(request, *args, **kwargs)
-        return HttpResponseRedirect(self.get_success_url())
+    def get_object(self):
+        return get_object_or_404(
+            Comment,
+            id=self.kwargs['comment_id']
+        )
