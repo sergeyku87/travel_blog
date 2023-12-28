@@ -64,6 +64,13 @@ class CategoryListView(BaseListMixin, ListView):
         )
 
 
+'''
+Привет, задал вопрос в личку по поводу 61 и 172 строки,
+что б время не терять, сдам работу, и позже, на основе ответа
+поправлю тогда
+'''
+
+
 class Profile(ListView):
     paginate_by = NUMBER_POSTS_ON_PAGE
     template_name = 'blog/profile.html'
@@ -76,15 +83,13 @@ class Profile(ListView):
         )
 
     def get_queryset(self):
-        print(self.kwargs['username'])
-
         return self.model.objects.filter(
             Q(author__username=self.request.user)
-            | (
-                Q(is_published=True)
-                & Q(category__is_published=True)
-                & Q(author__username=self.kwargs['username'])
-                & Q(pub_date__lte=timezone.now())
+            | Q(
+                Q(is_published=True),
+                Q(category__is_published=True),
+                Q(author__username=self.kwargs['username']),
+                Q(pub_date__lte=timezone.now())
             )
         ).annotate(
             comment_count=Count('comments')
@@ -120,10 +125,10 @@ class PostDetail(ModelFormMixin, DetailView):
     def get_queryset(self):
         return self.model.objects.filter(
             Q(author__username=self.request.user)
-            | (
-                Q(is_published=True)
-                & Q(category__is_published=True)
-                & Q(pub_date__lte=timezone.now())
+            | Q(
+                Q(is_published=True),
+                Q(category__is_published=True),
+                Q(pub_date__lte=timezone.now())
             )
         )
 
@@ -166,42 +171,20 @@ class PostCreate(LoginRequiredMixin, CommonForPost, CreateView):
         )
 
 
-class IsUser(UserPassesTestMixin):
+class IsUser(LoginRequiredMixin, UserPassesTestMixin):
     def test_func(self):
-        return str(self.request.user) == self.get_object().author.username
+        return self.request.user.username == self.get_object().author.username
 
-    def get_login_url(self):
-        return reverse_lazy(
+    def handle_no_permission(self):
+        return HttpResponseRedirect(reverse_lazy(
             'blog:post_detail',
             args=(self.kwargs['post_id'],)
         )
+        )
 
 
-'''
-Привет, беда, печаль (((
-В PostEdit я не могу подмешать IsUser, тесты выдают ошибку:
-
-AssertionError: Убедитесь, что при отправке формы
-редактирования поста неавторизованным пользователем он
-перенаправляется на страницу публикации
-(/posts/<int:post_id>/).
-
-А с методом post внутри все проходит, как с этим быть ?
-
-Не совсем понял по PermissionRequiredMixin, если классу
-PostEdit установить permission_required = 'blog.change_post'
-и разным пользователям дать права на редактирование,
-то где происходит проверка на авторство, не могут же они,
-имея одно лишь право change, менять любой контент,
-даже себе не принадлежащий?
-'''
-
-
-class PostEdit(CommonForPost, UpdateView):
-    def post(self, request, *args, **kwargs):
-        if self.get_object().author != request.user:
-            return HttpResponseRedirect(self.get_object().get_absolute_url())
-        return super().post(request, *args, **kwargs)
+class PostEdit(IsUser, CommonForPost, UpdateView):
+    ...
 
 
 class PostDelete(IsUser, CommonForPost, DeleteView):
