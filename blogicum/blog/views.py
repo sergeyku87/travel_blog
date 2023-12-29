@@ -64,13 +64,6 @@ class CategoryListView(BaseListMixin, ListView):
         )
 
 
-'''
-Привет, задал вопрос в личку по поводу 61 и 172 строки,
-что б время не терять, сдам работу, и позже, на основе ответа
-поправлю тогда
-'''
-
-
 class Profile(ListView):
     paginate_by = NUMBER_POSTS_ON_PAGE
     template_name = 'blog/profile.html'
